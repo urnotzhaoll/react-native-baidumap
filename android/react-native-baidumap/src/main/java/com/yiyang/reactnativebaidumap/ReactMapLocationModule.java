@@ -4,6 +4,11 @@ package com.yiyang.reactnativebaidumap;
 import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
+import com.baidu.mapapi.search.geocode.GeoCoder; 
+import com.baidu.mapapi.search.geocode.GeoCodeResult; 
+import com.baidu.mapapi.search.geocode.OnGetGeoCoderResultListener; 
+import com.baidu.mapapi.search.geocode.ReverseGeoCodeResult;
+import com.baidu.mapapi.search.geocode.GeoCodeOption;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -50,6 +55,7 @@ public class ReactMapLocationModule extends ReactContextBaseJavaModule {
     public void getCurrentPosition(ReadableMap options, final Callback success, Callback error) {
         LocationClientOption option = defaultOption();
         LocationClient client = new LocationClient(getReactApplicationContext().getApplicationContext(), option);
+        
         BDLocation lastLocation = client.getLastKnownLocation();
         if (lastLocation != null) {
             Double locationTime = convertLocationTime(lastLocation);
@@ -60,6 +66,48 @@ public class ReactMapLocationModule extends ReactContextBaseJavaModule {
             }
         }
         new SingleUpdateRequest(client, success, error).invoke();
+    }
+
+   @ReactMethod
+   public void reverseGeoCode(String city,String address,final Callback callback){
+            //新建编码查询对象
+            GeoCoder geocode = GeoCoder.newInstance();
+            //新建查询对象要查询的条件
+            GeoCodeOption GeoOption = new GeoCodeOption().city(city).address(address);
+            //发起地理编码请求
+            geocode.geocode(GeoOption);
+            //设置查询结果监听者
+            geocode.setOnGetGeoCodeResultListener(new OnGetGeoCoderResultListener() {
+                /**
+                 * 反地理编码查询结果回调函数
+                 * @param result  反地理编码查询结果
+                 */
+                @Override
+                public void onGetReverseGeoCodeResult(ReverseGeoCodeResult result) {
+
+                }
+                /**
+                 * 地理编码查询结果回调函数
+                 * @param result  地理编码查询结果
+                 */
+                @Override
+                public void onGetGeoCodeResult(GeoCodeResult result) {
+                    try{
+                        if(null!=result){
+                             if(null==result.getLocation()){
+                                callback.invoke("");
+                             }else{
+                                 java.text.DecimalFormat   df   =new   java.text.DecimalFormat("###.000000");  
+                                 callback.invoke(df.format(result.getLocation().latitude)+","+df.format(result.getLocation().longitude));
+                             }
+                        }else{
+                            callback.invoke("");
+                        }
+                    }catch(Exception e){
+                          callback.invoke("");
+                    }
+                }
+        });
     }
 
     @ReactMethod
@@ -90,6 +138,8 @@ public class ReactMapLocationModule extends ReactContextBaseJavaModule {
         option.setCoorType("bd09ll");
         option.setOpenGps(true);
         option.setScanSpan(30 * 1000);
+        option.setAddrType("all");
+        option.setIsNeedAddress(true);
         return option;
     }
 
@@ -103,6 +153,7 @@ public class ReactMapLocationModule extends ReactContextBaseJavaModule {
         coords.putDouble("longitude", location.getLongitude());
         coords.putDouble("accuracy", location.getRadius());
         coords.putDouble("heading", location.getDirection());
+        coords.putString("city", location.getCity());
         map.putMap("coords", coords);
         map.putDouble("timestamp", convertLocationTime(location));
 
