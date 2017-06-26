@@ -28,11 +28,12 @@ import com.facebook.imagepipeline.image.ImageInfo;
 import com.facebook.imagepipeline.request.ImageRequest;
 import com.facebook.imagepipeline.request.ImageRequestBuilder;
 import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.views.view.ReactViewGroup;
 
 /**
  * Created by yiyang on 16/3/1.
  */
-public class ReactMapMarker {
+public class ReactMapMarker extends ReactViewGroup{
     private Marker mMarker;
     private MarkerOptions mOptions;
 
@@ -76,6 +77,7 @@ public class ReactMapMarker {
             };
 
     public ReactMapMarker(Context context) {
+        super(context);
         this.mContext = context;
         mLogoHolder = DraweeHolder.create(createDraweeHierarchy(), null);
         mLogoHolder.onAttach();
@@ -96,9 +98,13 @@ public class ReactMapMarker {
             boolean draggable = annotation.getBoolean("draggable");
             options.draggable(draggable);
         }
-
+        options.draggable(false);
         if (annotation.hasKey("title")) {
             options.title(annotation.getString("title"));
+        }
+
+        if(annotation.hasKey("id")) {
+            options.zIndex(java.lang.Integer.parseInt(annotation.getString("id")));
         }
 
         options.icon(defaultIcon);
@@ -135,7 +141,7 @@ public class ReactMapMarker {
                 .build();
     }
 
-    public String getId() {return this.id;}
+    public String getMarkerId() {return this.id;}
     public Marker getMarker() {return this.mMarker;}
     public MarkerOptions getOptions() {return this.mOptions;}
 

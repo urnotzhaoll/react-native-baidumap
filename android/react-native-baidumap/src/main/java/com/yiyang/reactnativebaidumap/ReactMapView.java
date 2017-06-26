@@ -1,19 +1,29 @@
 package com.yiyang.reactnativebaidumap;
 
 import android.util.Log;
+import android.graphics.Point;
 
 import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
 import com.baidu.mapapi.map.BaiduMap;
+import com.baidu.mapapi.map.MapStatus;
 import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
 import com.baidu.mapapi.map.MyLocationData;
 import com.baidu.mapapi.model.LatLng;
+import com.baidu.mapapi.map.Projection;
+import com.baidu.mapapi.map.BaiduMap.OnMarkerClickListener;
 import com.baidu.mapapi.model.LatLngBounds;
+import com.facebook.react.bridge.WritableNativeMap;
+import com.facebook.react.bridge.WritableMap;
+import com.baidu.mapapi.map.Marker;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+
 
 /**
  * Created by yiyang on 16/2/29.
@@ -27,6 +37,10 @@ public class ReactMapView {
     private ReactMapMyLocationConfiguration mConfiguration;
 
     private boolean autoZoomToSpan;
+
+    private final BaiduMapViewManager baiduMapViewManager;
+
+    private final Map<Marker, ReactMapMarker> markerMap = new HashMap<>();
 
     public boolean isAutoZoomToSpan() {
         return autoZoomToSpan;
@@ -42,8 +56,9 @@ public class ReactMapView {
     private List<ReactMapOverlay> mOverlays = new ArrayList<ReactMapOverlay>();
     private List<String> mOverlayIds = new ArrayList<String>();
 
-    public ReactMapView(MapView mapView) {
+    public ReactMapView(MapView mapView,BaiduMapViewManager baiduMapViewManager) {
         this.mMapView = mapView;
+        this.baiduMapViewManager=baiduMapViewManager;
     }
 
     public BaiduMap getMap() {
@@ -113,7 +128,7 @@ public class ReactMapView {
                 continue;
             }
 
-            newMarkerIds.add(marker.getId());
+            newMarkerIds.add(marker.getMarkerId());
 
             if (!mMarkerIds.contains(marker.getId())) {
                 markersToAdd.add(marker);
@@ -129,6 +144,8 @@ public class ReactMapView {
             if (!newMarkerIds.contains(marker.getId())) {
                 markersToDelete.add(marker);
             }
+
+            markerMap.put(marker.getMarker(),marker);
         }
 
         if (!markersToDelete.isEmpty()) {
@@ -152,11 +169,92 @@ public class ReactMapView {
         this.mMarkerIds = newMarkerIds;
     }
 
+    public WritableMap makeClickEventData(Marker marker) {
+
+        LatLng point=marker.getPosition();
+        WritableMap event = new WritableNativeMap();
+
+        WritableMap coordinate = new WritableNativeMap();
+        coordinate.putDouble("latitude", point.latitude);
+        coordinate.putDouble("longitude", point.longitude);
+        event.putMap("coordinate", coordinate);
+
+        Projection projection = this.mMapView.getMap().getProjection();
+        Point screenPoint = projection.toScreenLocation(point);
+
+        WritableMap position = new WritableNativeMap();
+        position.putDouble("x", screenPoint.x);
+        position.putDouble("y", screenPoint.y);
+        event.putMap("position", position);
+
+        event.putInt("id",marker.getZIndex());
+
+        return event;
+    }
+
 
     public void onMapLoaded() {
         if (this.autoZoomToSpan) {
             this.zoomToSpan();
         }
+        final MapView view=this.mMapView;
+        //对Marker的点击监听  
+        this.mMapView.getMap().setOnMarkerClickListener(new OnMarkerClickListener()  
+        {  
+            @Override  
+            public boolean onMarkerClick(final Marker marker)  
+            {  
+                WritableMap event;
+                event = makeClickEventData(marker);
+                event.putString("action", "annotation-click");
+                // baiduMapViewManager.pushEvent(markerMap.get(marker),"onPress", event);
+                baiduMapViewManager.pushEvent(view,"onPress", event);
+                return true;  
+            }  
+        });  
+        //对Markerd的拖拽监听
+        this.mMapView.getMap().setOnMarkerDragListener(new BaiduMap.OnMarkerDragListener() {
+            public void onMarkerDrag(Marker marker) {
+                
+            }
+            public void onMarkerDragEnd(Marker marker) {  
+                WritableMap event;
+                event = makeClickEventData(marker);
+                event.putString("action", "annotation-drag");
+                event.putDouble("latitude", marker.getPosition().latitude);
+                event.putDouble("longitude", marker.getPosition().longitude);
+                baiduMapViewManager.pushEvent(view,"onPress", event);
+            }
+            public void onMarkerDragStart(Marker marker) {
+              
+            }
+        });
+        //对地图状态改变监听
+        this.mMapView.getMap().setOnMapStatusChangeListener(new BaiduMap.OnMapStatusChangeListener() {
+            /** 
+            * 手势操作地图，设置地图状态等操作导致地图状态开始改变。 
+            * @param status 地图状态改变开始时的地图状态 
+            */  
+            public void onMapStatusChangeStart(MapStatus status){  
+            }  
+            /** 
+            * 地图状态变化中 
+            * @param status 当前地图状态 
+            */  
+            public void onMapStatusChange(MapStatus status){  
+            }  
+            /** 
+            * 地图状态改变结束 
+            * @param status 地图状态改变结束后的地图状态 
+            */  
+            public void onMapStatusChangeFinish(MapStatus status){
+                WritableMap event = new WritableNativeMap();
+                event.putDouble("latitude", status.target.latitude);
+                event.putDouble("longitude",status.target.longitude);
+                event.putString("action", "mapStatus-change");
+                baiduMapViewManager.pushEvent(view,"onPress", event);
+            }  
+        });
     }
 
     public void zoomToSpan(List<ReactMapMarker> markers, List<ReactMapOverlay> overlays) {
@@ -263,4 +361,5 @@ public class ReactMapView {
         option.setCoorType("bd09ll");
         return option;
     }
+
 }

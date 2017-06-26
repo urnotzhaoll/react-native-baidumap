@@ -4,10 +4,16 @@ import android.content.Context;
 import android.os.StrictMode;
 import android.support.annotation.Nullable;
 import android.util.Log;
+import android.R;
+import android.view.View;
 
 import com.baidu.mapapi.SDKInitializer;
 import com.baidu.mapapi.map.BaiduMap;
 import com.baidu.mapapi.map.MapStatus;
+import com.baidu.mapapi.map.BitmapDescriptor;
+import com.baidu.mapapi.map.BitmapDescriptorFactory;
+import com.baidu.mapapi.map.OverlayOptions;
+import com.baidu.mapapi.map.MarkerOptions;
 import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
 import com.baidu.mapapi.model.LatLng;
@@ -17,8 +23,12 @@ import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.ReadableType;
 import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.SimpleViewManager;
+import com.facebook.react.uimanager.ViewGroupManager;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.annotations.ReactProp;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.uimanager.events.RCTEventEmitter;
+import com.facebook.react.bridge.ReactContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +37,7 @@ import java.util.Map;
 /**
  * Created by yiyang on 16/3/1.
  */
-public class BaiduMapViewManager extends SimpleViewManager<MapView> {
+public class BaiduMapViewManager extends ViewGroupManager<MapView> {
     public static final String RCT_CLASS = "RCTBaiduMap";
 
     public static final int COMMAND_ZOOM_TO_LOCS = 1;
@@ -38,6 +48,7 @@ public class BaiduMapViewManager extends SimpleViewManager<MapView> {
 
     private boolean isMapLoaded;
 
+   private  ReactContext reactContext;
 
     @Override
     public String getName() {
@@ -48,7 +59,7 @@ public class BaiduMapViewManager extends SimpleViewManager<MapView> {
     protected MapView createViewInstance(ThemedReactContext themedReactContext) {
         SDKInitializer.initialize(themedReactContext.getApplicationContext());
         MapView view = new MapView(themedReactContext);
-        mMapView = new ReactMapView(view);
+        mMapView = new ReactMapView(view,this);
         view.getMap().setOnMapLoadedCallback(new BaiduMap.OnMapLoadedCallback() {
             @Override
             public void onMapLoaded() {
@@ -57,6 +68,7 @@ public class BaiduMapViewManager extends SimpleViewManager<MapView> {
             }
         });
         this.mContext = themedReactContext;
+        this.reactContext=themedReactContext;
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
         return view;
@@ -191,6 +203,16 @@ public class BaiduMapViewManager extends SimpleViewManager<MapView> {
         }
     }
 
+    //zoo
+    @Override
+    @Nullable
+    public Map getExportedCustomDirectEventTypeConstants() {
+        Map<String, Map<String, String>> map = MapBuilder.of(
+                "onPress", MapBuilder.of("registrationName", "onPress")
+        );
+        return map;
+    }
+
     @javax.annotation.Nullable
     @Override
     public Map<String, Integer> getCommandsMap() {
@@ -275,5 +297,10 @@ public class BaiduMapViewManager extends SimpleViewManager<MapView> {
         }
 
         return result;
+    }
+
+     //zoo
+     public void pushEvent(View view,String name, WritableMap data) {
+        reactContext.getJSModule(RCTEventEmitter.class).receiveEvent(view.getId(), name, data);
     }
 }
